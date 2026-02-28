@@ -35,14 +35,35 @@ The following table summarizes the performance of all experiments. The **RMSPE**
 
 (Note: Standard Linear Regression is a simple parametric model with no hyperparameters to optimize, serving purely as a fixed baseline for performance comparison.)
 
+## Statistical Model Comparison (ANOVA)
+To ensure the performance differences between models were not due to random chance, we performed a **One-Way ANOVA (Analysis of Variance)** test on the squared prediction errors of all three models on the Test set.
+
+*   **F-Statistic:** `9518.81`
+*   **P-Value:** `0.0000e+00` ($p < 0.05$)
+
+**Conclusion:** The result is **statistically significant**, allowing us to reject the null hypothesis. The analysis confirms that the non-linear architecture of XGBoost provides a fundamental improvement over the baseline, not just a random fluctuation.
+
+| Model | Mean Squared Error (Lower is Better) |
+| :--- | :--- |
+| **Linear Regression** | 8,098,267.89 |
+| **Random Forest** | 1,382,935.45 |
+| **XGBoost** | **1,236,260.94** |
+
 ## Key Features
 *   **Modular Architecture:** Code is separated into logical modules (`preprocessing`, `model`, `evaluation`, `optimization`) within the `src/` package.
 *   **Reproducibility:** All hyperparameters, file paths, and split ratios are centralized in `src/params.yaml`.
 *   **Automated Tuning:** Implements `RandomizedSearchCV` with **Time Series Split** to prevent data leakage during optimization.
 *   **Conditional Logic:** The pipeline only triggers expensive hyperparameter tuning if the baseline model fails to meet the defined performance threshold.
 *   **Robust Evaluation:** Optimized for the competition metric **RMSPE** (Root Mean Square Percentage Error).
+*   **Deep Error Analysis:** Includes a dedicated notebook (`notebooks/error_analysis.ipynb`) for systematic inspection of failure modes, residual distribution analysis, and     bias detection.
 *   **Unit Testing:** `pytest` suite ensures data cleaning logic and feature engineering integrity before training.
 
+## Deep Error Analysis
+Conducted a systematic failure analysis to diagnose model weaknesses:
+*   **Residual Distribution:** The error residuals follow a normal distribution centered at zero, confirming the model is **statistically unbiased**.
+*   **Volatility Impact:** Analysis reveals that **Promotional days** exhibit significantly higher error variance than non-promotional days, indicating the model struggles       with high-volatility sales spikes.
+*   **Failure Modes:** The "Worst Predictions" inspection shows the model tends to **under-predict extreme outliers** (e.g., days with >25k sales), suggesting a need for         more aggressive feature engineering for peak events.
+  
 ## Testing Strategy
 We use `pytest` to ensure pipeline reliability:
 1.  **Schema Checks:** Ensures all required columns exist after merging.
@@ -61,10 +82,12 @@ Rossmann-Sales-Pipeline/
 │   └── XGBoost.pkl
 ├── notebooks/              # Experimental analysis
 │   └── eda_analysis.ipynb
+|   ├── error_analysis.ipynb
 ├── src/                    # Source code package
 │   ├── __init__.py
+|   ├── compare_models.py   # Statistical Model Comparison
 │   ├── data_loader.py      # Data ingestion logic
-│   ├── evaluation.py       # Metrics (RMSPE, MAPE, R2)
+│   ├── evaluation.py       # Metrics (RMSPE, MAPE,RMSE, R2)
 │   ├── main.py             # Pipeline orchestrator
 │   ├── model_serializer.py # Joblib save/load logic
 │   ├── model.py            # Model definitions
@@ -121,6 +144,13 @@ Execute the main script from the **root directory**:
 
 ```bash
 python src/main.py
+```
+
+### 4. Run the ANOVA Test
+Run the following command in the terminal:
+
+```bash
+python -m src.compare_models
 ```
 
 The pipeline will Load -> Clean -> Engineer Features -> Split -> Train Baseline -> Evaluate -> (Conditionally Tune) -> Test -> Save Model.
