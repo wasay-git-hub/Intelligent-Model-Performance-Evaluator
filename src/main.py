@@ -1,4 +1,4 @@
-from src.preprocessing import load_and_merge, clean_data, feature_engineering, split_data
+from src.preprocessing import load_and_merge, split_raw_data, process_data, extract_X_y
 from src.model import train_model, model_prediction
 from src.utils import load_params
 from src.model_serializer import save_model
@@ -16,13 +16,22 @@ def run_pipeline():
     print("Step 1: Loading Data")
     df = load_and_merge(train_dataset, store_dataset)
 
-    print("Step 2: Cleaning & Engineering")
-    df = clean_data(df)
-    df = feature_engineering(df)
+    print("Step 2: Splitting Raw Data (Preventing Leakage)")
+    train_raw, cv_raw, test_raw = split_raw_data(df)
 
-    print("Step 3: Splitting")
-    X_train, y_train, X_cv, y_cv, X_test, y_test = split_data(df)
+    print("Step 3: Cleaning & Engineering (Using Train Stats)")
+    # 1. Process Training Data
+    train_df, train_stats = process_data(train_raw, train_stats=None)
+    
+    # 2. Process CV & Test Data
+    cv_df, _ = process_data(cv_raw, train_stats=train_stats)
+    test_df, _ = process_data(test_raw, train_stats=train_stats)
 
+    # 3. Extract X and y
+    X_train, y_train = extract_X_y(train_df)
+    X_cv, y_cv = extract_X_y(cv_df)
+    X_test, y_test = extract_X_y(test_df)
+    
     print("Step 4: Training Model")
     model_type = config['models']['type']
     print(f"\nModel Type: {model_type}\n")
